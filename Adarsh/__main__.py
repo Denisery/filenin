@@ -13,6 +13,7 @@ from aiohttp import web
 from .server import web_server
 from .utils.keepalive import ping_server
 from Adarsh.bot.clients import initialize_clients
+from pyrogram.errors import FloodWait   # Correct import
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,24 +25,32 @@ logging.getLogger("aiohttp.web").setLevel(logging.ERROR)
 
 ppath = "Adarsh/bot/plugins/*.py"
 files = glob.glob(ppath)
-StreamBot.start()
-loop = asyncio.get_event_loop()
 
+loop = asyncio.get_event_loop()
 
 async def start_services():
     print('\n')
-    print('------------------- Initalizing Telegram Bot -------------------')
-    bot_info = await StreamBot.get_me()
-    StreamBot.username = bot_info.username
+    print('------------------- Initializing Telegram Bot -------------------')
+
+    # --- Move StreamBot.start() here ---
+    try:
+        await StreamBot.start()
+    except FloodWait as e:
+        print(f"Flood wait detected: Waiting {e.value} seconds before starting bot...")
+        await asyncio.sleep(e.value)
+        await StreamBot.start()
+
     print("------------------------------ DONE ------------------------------")
     print()
-    print(
-        "---------------------- Initializing Clients ----------------------"
-    )
+
+    bot_info = await StreamBot.get_me()
+    StreamBot.username = bot_info.username
+
+    print("---------------------- Initializing Clients ----------------------")
     await initialize_clients()
     print("------------------------------ DONE ------------------------------")
     print('\n')
-    print('--------------------------- Importing ---------------------------')
+    print('--------------------------- Importing Plugins ---------------------------')
     for name in files:
         with open(name) as a:
             patt = Path(a.name)
@@ -53,31 +62,25 @@ async def start_services():
             spec.loader.exec_module(load)
             sys.modules["Adarsh.bot.plugins." + plugin_name] = load
             print("Imported => " + plugin_name)
+
     if Var.ON_HEROKU:
         print("------------------ Starting Keep Alive Service ------------------")
-        print()
         asyncio.create_task(ping_server())
-    print('-------------------- Initalizing Web Server -------------------------')
+
+    print('-------------------- Initializing Web Server -------------------------')
     app = web.AppRunner(await web_server())
     await app.setup()
     bind_address = "0.0.0.0" if Var.ON_HEROKU else Var.BIND_ADRESS
     await web.TCPSite(app, bind_address, Var.PORT).start()
-    print('----------------------------- DONE ---------------------------------------------------------------------')
+    print('----------------------------- DONE ------------------------------')
     print('\n')
-    print('---------------------------------------------------------------------------------------------------------')
-    print('---------------------------------------------------------------------------------------------------------')
-    print(' follow me for more such exciting bots! https://github.com/LazyDeveloperr/Lazy-Streamer-BOT')
-    print('---------------------------------------------------------------------------------------------------------')
-    print('\n')
-    print('----------------------- Service Started -----------------------------------------------------------------')
-    print('                        bot =>> {}'.format((await StreamBot.get_me()).first_name))
-    print('                        server ip =>> {}:{}'.format(bind_address, Var.PORT))
+    print('----------------------- Service Started -------------------------')
+    print('                        Bot =>> {}'.format((await StreamBot.get_me()).first_name))
+    print('                        Server IP =>> {}:{}'.format(bind_address, Var.PORT))
     print('                        Owner =>> {}'.format((Var.OWNER_USERNAME)))
     if Var.ON_HEROKU:
-        print('                        app runnng on =>> {}'.format(Var.FQDN))
-    print('---------------------------------------------------------------------------------------------------------')
-    print('Give a star to my repo https://github.com/LazyDeveloperr/Lazy-Streamer-BOT  also follow me for new bots')
-    print('---------------------------------------------------------------------------------------------------------')
+        print('                        App running on =>> {}'.format(Var.FQDN))
+    print('-----------------------------------------------------------------')
     await idle()
 
 if __name__ == '__main__':

@@ -1,0 +1,7 @@
+venv
+.env
+Adarsh/__pycache__
+Adarsh/bot/__pycache__
+Adarsh/server/__pycache__
+Adarsh/utils/__pycache__
+Adarsh/Web Streamer.session
